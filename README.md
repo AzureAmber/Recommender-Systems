@@ -196,7 +196,9 @@ restaurants_jaccard = np.zeros((len(restaurants),len(restaurants)))
 words_per_restaurant = [set(filter(None, re.split('[.!?,; ]', x.lower()))) for x in restaurants['Augmented Description']]
 for i in range(0,len(restaurants)):
     for j in range(0,len(restaurants)):
-        restaurants_jaccard[i,j] = len(words_per_restaurant[i].intersection(words_per_restaurant[j])) / len(words_per_restaurant[i].union(words_per_restaurant[j]))
+        same_len = len(words_per_restaurant[i].intersection(words_per_restaurant[j]))
+        total_len = len(words_per_restaurant[i].union(words_per_restaurant[j]))
+        restaurants_jaccard[i,j] = same_len / total_len
         
 restaurants_jaccard = pd.DataFrame(
     restaurants_jaccard,
@@ -240,8 +242,12 @@ calculate the TF-IDF for each of the 100 words.
 ```py
 # function to calculate TF-IDF
 def TD_IDF(word):
-    word_count_by_restaurant = restaurants['Augmented Description'].apply(lambda x: list(filter(None, re.split('[.!?,; ]', x.lower()))).count(word.lower()))
-    total_words_by_restaurant = restaurants['Augmented Description'].apply(lambda x: len(list(filter(None, re.split('[.!?,; ]', x.lower())))))
+    word_count_by_restaurant = restaurants['Augmented Description'].apply(
+        lambda x: list(filter(None, re.split('[.!?,; ]', x.lower()))).count(word.lower())
+    )
+    total_words_by_restaurant = restaurants['Augmented Description'].apply(
+        lambda x: len(list(filter(None, re.split('[.!?,; ]', x.lower()))))
+    )
     total_doc = len(restaurants['Augmented Description'])
     docs_with_word = sum(word_count_by_restaurant >= 1)
     
