@@ -169,7 +169,7 @@ def contentfilter_recommendation(name, score_type='Euclidean'):
         return( data_ret[data_ret.index != fav_restaurant].head(10) )
 ```
 
-You can locate my Popularity Matching Recommendation System in the `code` directory titled `content_based1`.
+You can locate my Content-based Filtering Recommendation System in the `code` directory titled `content_based1`.
 
 #### B2B. Using NLP
 
@@ -296,14 +296,67 @@ def contentfilter_recommendation_td_idf(name, max_suggest):
     return( data_ret[data_ret.index != restaurant_to_input].head(max_suggest) )
 ```
 
-You can locate my Popularity Matching Recommendation System with NLP in the `code` directory titled `content_based2`.
+You can locate my Content-based Filtering Recommendation System with NLP in the `code` directory titled `content_based2`.
 
 
 
+### B3. Collaborative Filtering
 
+A Collaborative Filtering System recommends items indirectly by finding similar users.
 
+In this case, find someone that is similar to the user and recommend a restaurant that he/she
+highly rated. In my implementation, I used the information of unique users in the
+`Reviews` dataset along with the cosine similarity metric. Note this is similar
+to the Content-based Filtering System, but the information used is the user data
+instead of the data about the items (i.e the restaurants).
 
+```py
+# aggregate data for each unique user
+data = reviews[['Reviewer Name', 'Birth Year', 'Marital Status', 'Has Children?',
+                'Vegetarian?', 'Weight (lb)', 'Height (in)', 'Average Amount Spent',
+                'Preferred Mode of Transport', 'Northwestern Student?']]
 
+data_users = data.groupby(['Reviewer Name']).agg(**{
+    'Birth Year': ('Birth Year', lambda x: pd.Series.mode(x)[0]),
+    'Marital Status': ('Marital Status', lambda x: pd.Series.mode(x)[0]),
+    'Has Children?': ('Has Children?', lambda x: pd.Series.mode(x)[0]),
+    'Vegetarian?': ('Vegetarian?', lambda x: pd.Series.mode(x)[0]),
+    'Weight (lb)': ('Weight (lb)', 'mean'),
+    'Height (in)': ('Height (in)', 'mean'),
+    'Average Amount Spent': ('Average Amount Spent', lambda x: pd.Series.mode(x)[0]),
+    'Preferred Mode of Transport': ('Preferred Mode of Transport', lambda x: pd.Series.mode(x)[0]),
+    'Northwestern Student?': ('Northwestern Student?', lambda x: pd.Series.mode(x)[0])
+}).reset_index()
+# convert categorical data into numerical
+data_users = pd.get_dummies(
+    data_users,
+    columns=['Marital Status', 'Has Children?', 'Vegetarian?', 'Average Amount Spent',
+             'Preferred Mode of Transport', 'Northwestern Student?'],
+    drop_first=True, dtype=int
+)
+# remove user name
+data_demographics = data_users.drop(columns=['Reviewer Name'])
+# cosine distance of users
+user_demo_cosine = pd.DataFrame(
+    cosine_distances(data_demographics, data_demographics),
+    columns=data_users['Reviewer Name'],
+    index=data_users['Reviewer Name']
+)
+```
+
+Finally, recommend items from someone that is most similar to the user.
+In my implementation, I found the top n most similar users and find all restaurants
+that they rated. Then, returned the restaurants that are the highest rated.
+
+```py
+def collab_filter_demographic(name, n_similar):
+    most_similar_users = user_demo_cosine[user_demo_cosine.index != name][name].sort_values(ascending=True).index[0:n_similar]
+    possible_recs = reviews[reviews['Reviewer Name'].isin(most_similar_users)].groupby(['Reviewer Name'])
+    top_recs = possible_recs.apply(lambda x: x[x['Rating'] == x['Rating'].max()])
+    return( top_recs[['Restaurant Name', 'Rating']].reset_index().drop(columns=['level_1']) )
+```
+
+You can locate my Collaborative Filtering Recommendation System with NLP in the `code` directory titled `collaborative`.
 
 
 
