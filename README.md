@@ -113,7 +113,7 @@ that are the most similar through some metric. Some common similarity metrics ar
 There are two main issues with these metrics.
 
 (1) For numerical variables, their values can be in different scales
-(i.e. \\\$, $\degree C$, mi, etc).
+(i.e. \\$, $\degree C$, mi, etc).
 A common solution is to apply some kind of normalization. Some types are:
 
 - Standard Norm: $\frac{x - \overline{x}}{\sigma_x}$
@@ -228,9 +228,9 @@ For word w:
 
 
 $$
-    TF\_IDF(w,D_i) = \frac{\text{\# times w appears in } D_i}
-                    {\text{\# of words in } D_i}
-        * \ln( \frac{\text{\# of } D_i}{\text{\# } D_i \text{ with w}} )
+    TF\_IDF(w,D_i) = \frac{\text{\\# times w appears in } D_i}
+                    {\text{\\# of words in } D_i}
+        * \ln( \frac{\text{\\# of } D_i}{\text{\# } D_i \text{ with w}} )
 $$
 
 For my implementation, I took the top 100 words with the most occurence across
@@ -290,7 +290,7 @@ def contentfilter_recommendation_td_idf(name, max_suggest):
     return( data_ret[data_ret.index != restaurant_to_input].head(max_suggest) )
 ```
 
-
+You can locate my Popularity Matching Recommendation System with NLP in the `code` directory titled `content_based2`.
 
 
 
