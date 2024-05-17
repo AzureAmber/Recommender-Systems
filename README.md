@@ -230,7 +230,7 @@ For word w:
 $$
     TF\_IDF(w,D_i) = \frac{\text{number of times w appears in } D_i}
                     {\text{number of words in } D_i}
-        * \ln( \frac{\text{number of } D_i}{\text{\# } D_i \text{ with w}} )
+        * \ln( \frac{\text{number of } D_i}{\text{number of } D_i \text{ with w}} )
 $$
 
 For my implementation, I took the top 100 words with the most occurence across
