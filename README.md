@@ -102,6 +102,8 @@ You can locate my Popularity Matching Recommendation System in the `code` direct
 
 ### B2. Content-based Filtering
 
+#### B2A. Using numerical and categorical information
+
 A Content-based Filtering System uses information about each item and recommends items
 that are the most similar through some metric. Some common similarity metrics are:
 
@@ -111,7 +113,7 @@ that are the most similar through some metric. Some common similarity metrics ar
 There are two main issues with these metrics.
 
 (1) For numerical variables, their values can be in different scales
-(i.e. \$, $\degree C$, mi, etc).
+(i.e. \\\$, $\degree C$, mi, etc).
 A common solution is to apply some kind of normalization. Some types are:
 
 - Standard Norm: $\frac{x - \overline{x}}{\sigma_x}$
@@ -168,3 +170,134 @@ def contentfilter_recommendation(name, score_type='Euclidean'):
 ```
 
 You can locate my Popularity Matching Recommendation System in the `code` directory titled `content_based1`.
+
+#### B2B. Using NLP
+
+Another method instead of using numerical or categorical variables is to use NLP.
+Since items sometimes are associated with some kind of description, you can use NLP
+to convert descriptions into numerical embedding. Then, these embeddings can be used
+with the similarity metric.
+
+Some models that perform NLP well are BERT and GPT.
+In this project, I will instead perform some low level NLP that are easier to understand.
+
+(1) Jaccard Distance
+
+Let two items have descriptions $D_i, D_j$. The Jaccard distance metric is the
+proportion of number of unique words that the items have in common.
+
+$$
+    Jaccard(D_i,D_j) = \frac{D_i \cap D_j}{D_i \cup D_j}
+$$
+
+```py
+restaurants_jaccard = np.zeros((len(restaurants),len(restaurants)))
+
+words_per_restaurant = [set(filter(None, re.split('[.!?,; ]', x.lower()))) for x in restaurants['Augmented Description']]
+for i in range(0,len(restaurants)):
+    for j in range(0,len(restaurants)):
+        restaurants_jaccard[i,j] = len(words_per_restaurant[i].intersection(words_per_restaurant[j])) / len(words_per_restaurant[i].union(words_per_restaurant[j]))
+        
+restaurants_jaccard = pd.DataFrame(
+    restaurants_jaccard,
+    columns=restaurants['Restaurant Name'],
+    index=restaurants['Restaurant Name']
+)
+```
+
+Then, recommend items with low Jaccard distances to the user's highly rated restaurant.
+In my implementation, instead of choosing the user's highest rating restaurant, I
+took a random restaurant that the user highly rated.
+
+```py
+def contentfilter_recommendation_jaccard(name, max_suggest):
+    reviewer_restaurants = reviews[reviews['Reviewer Name'] == name]
+    fav_restaurants = list(reviewer_restaurants[reviewer_restaurants['Rating'] == reviewer_restaurants['Rating'].max()]['Restaurant Name'])
+    restaurant_to_input = random.sample(fav_restaurants, 1)[0]
+    data_ret = restaurants_jaccard.loc[:,restaurant_to_input].sort_values(ascending=False)
+    
+    return( data_ret[data_ret.index != restaurant_to_input].head(max_suggest) )
+```
+
+(2) TF-IDF
+
+One issue with Jaccard distance is that each word in the description has the same value.
+But, words like 'the', 'is', etc hold little value. TF-IDF assigns values to words
+with the number of times the word appears in the description.
+For word w:
+
+
+$$
+    TF\_IDF(w,D_i) = \frac{\text{\# times w appears in } D_i}
+                    {\text{\# of words in } D_i}
+        * \ln( \frac{\text{\# of } D_i}{\text{\# } D_i \text{ with w}} )
+$$
+
+For my implementation, I took the top 100 words with the most occurence across
+all descriptions. Then, for each restaurant's description,
+calculate the TF-IDF for each of the 100 words.
+
+```py
+# function to calculate TF-IDF
+def TD_IDF(word):
+    word_count_by_restaurant = restaurants['Augmented Description'].apply(lambda x: list(filter(None, re.split('[.!?,; ]', x.lower()))).count(word.lower()))
+    total_words_by_restaurant = restaurants['Augmented Description'].apply(lambda x: len(list(filter(None, re.split('[.!?,; ]', x.lower())))))
+    total_doc = len(restaurants['Augmented Description'])
+    docs_with_word = sum(word_count_by_restaurant >= 1)
+    
+    restaurants_tdidf = pd.DataFrame(
+        list(word_count_by_restaurant / total_words_by_restaurant * np.log(total_doc / docs_with_word)),
+        columns=[word.lower()], index=restaurants['Restaurant Name']
+    )
+    
+    return( restaurants_tdidf )
+
+# top 100 most common words
+descriptions_all_words = re.split('[.!?,; ]', " ".join(list(restaurants['Augmented Description'])).lower())
+most_pop_words = list(pd.Series(filter(None, descriptions_all_words)).value_counts().sort_values(ascending=False).head(100).index)
+
+# calculate tf-idf for each word
+restaurants_td_idf = np.zeros((len(restaurants),len(most_pop_words)))
+
+for j in range(0,len(most_pop_words)):
+    cur_word_td_idf = TD_IDF(most_pop_words[j])
+    for i in range(0,len(restaurants)): 
+        restaurants_td_idf[i,j] = cur_word_td_idf.iloc[i]
+        
+restaurants_td_idf = pd.DataFrame(
+    restaurants_td_idf,
+    columns=most_pop_words,
+    index=restaurants['Restaurant Name']
+)
+```
+
+Finally, use the TF-IDF along with the euclidean distance similarity distance to
+recommend similar restaurants.
+
+```py
+# calculate euclidean distances
+restaurants_td_idf_euclidean = pd.DataFrame(
+    euclidean_distances(restaurants_td_idf, restaurants_td_idf),
+    columns=restaurants['Restaurant Name'], index=restaurants['Restaurant Name']
+)
+# recommendation system
+def contentfilter_recommendation_td_idf(name, max_suggest):
+    reviewer_restaurants = reviews[reviews['Reviewer Name'] == name]
+    fav_restaurants = list(reviewer_restaurants[reviewer_restaurants['Rating'] == reviewer_restaurants['Rating'].max()]['Restaurant Name'])
+    restaurant_to_input = random.sample(fav_restaurants, 1)[0]
+    data_ret = restaurants_td_idf_euclidean.loc[:,restaurant_to_input].sort_values(ascending=True)
+    
+    return( data_ret[data_ret.index != restaurant_to_input].head(max_suggest) )
+```
+
+
+
+
+
+
+
+
+
+
+
+
