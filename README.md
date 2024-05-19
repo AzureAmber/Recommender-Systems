@@ -1,16 +1,22 @@
 # Recommender-Systems
 
-In this project, I will be showcasing how to implement various
+Many systems today have implemented ways to generate useful or liked
+suggestions for users to engage with (i.e. Netflix, Youtube, Spotify, etc).
+Each of them use some type of recommender system, an information filtering
+system that generates suggestions.
+In this project, I will be showcasing how to implement a few
 types of recommendation systems including:
 
 - Popularity Matching
 - Content-based Filtering
+    - Using numerical / categorical data
+    - Using simple Natural Language Processing (NLP) for textual data
 - Collaborative Filtering
+    - Using information about users
+    - Using information about users related to the output
 
-Additionally, I will also implement a bit of Natural Language
-Processing (NLP) in order to perform predictive analysis.
-
-In this project, I will provide explanations and implemntations in Python.
+In this project, I will be explaining how to implement the recommender systems above
+in Python using recommendations for various restaurants around Evanston, IL.
 
 
 
@@ -23,6 +29,7 @@ The first dataset `Restaurants` contains basic information about restaurants
 in Evanton, IL. The second dataset `Reviews` contains reviews of the restaurants
 along with some information on the reviewers.
 
+Remember, the first step to any data project is to prepare and 'fix' the data.
 The `Restaurants` dataset is already clean so no issues needs to be addressed there.
 However, the `Reviews` dataset has some basic issues (missingness) that needs to be
 prepared properly in order to be usable. To address missingness, I will be using
@@ -39,9 +46,7 @@ You can locate my data preparation in the `code` directory titled `data_preparat
 
 
 
-## B. Implementing Recommender Systems
-
-### B1. Popularity Matching
+## B. Popularity Matching
 
 A Popularity Matching System is pretty simple. Just recommend the most popular item
 through some metric.
@@ -102,9 +107,9 @@ You can locate my Popularity Matching Recommendation System in the `code` direct
 
 
 
-### B2. Content-based Filtering
+## C. Content-based Filtering
 
-#### B2A. Using numerical and categorical information
+### C1. Using numerical and categorical information
 
 A Content-based Filtering System uses information about each item and recommends items
 that are the most similar through some metric. Some common similarity metrics are:
@@ -173,7 +178,7 @@ def contentfilter_recommendation(name, score_type='Euclidean'):
 
 You can locate my Content-based Filtering Recommendation System in the `code` directory titled `content_based1`.
 
-#### B2B. Using NLP
+### C2. Using NLP
 
 Another method instead of using numerical or categorical variables is to use NLP.
 Since items sometimes are associated with some kind of description, you can use NLP
@@ -302,7 +307,7 @@ You can locate my Content-based Filtering Recommendation System with NLP in the 
 
 
 
-### B3. Collaborative Filtering
+## D. Collaborative Filtering
 
 A Collaborative Filtering System recommends items indirectly by finding similar users.
 
@@ -310,7 +315,7 @@ In this case, find someone that is similar to the user and recommend a restauran
 highly rated. Thus, the main objective of a Collaborative Filtering System is to find
 similar users.
 
-#### B3A. Using information about the users
+### D1. Using information about the users
 
 Use information about the users to find similar users and then recommend items
 from similar users. Note this is similar to the Content-based Filtering System, but the 
@@ -370,7 +375,7 @@ def collab_filter_demographic(name, n_similar):
 You can locate my Collaborative Filtering Recommendation System with user information
 in the `code` directory titled `collaborative1`.
 
-#### B3B. Using information about the items directly from the users
+### D2. Using information from the users related to the items
 
 Recall that the purpose of finding similar users is to be able to find items to recommend
 that a user would probably like. Previously, we are able to recommend items indirectly by
@@ -508,7 +513,7 @@ def collab_filter_scores(name, n_similar):
     return( top_recs[['Restaurant Name', 'Rating']].reset_index().drop(columns=['level_1']) )
 ```
 
-You can locate my Collaborative Filtering Recommendation System with user' score ratings
+You can locate my Collaborative Filtering Recommendation System with users' score ratings
 in the `code` directory titled `collaborative2`.
 
 
