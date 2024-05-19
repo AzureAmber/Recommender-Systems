@@ -37,6 +37,8 @@ You can locate my data preparation in the `code` directory titled `data_preparat
 
 
 
+
+
 ## B. Implementing Recommender Systems
 
 ### B1. Popularity Matching
@@ -305,10 +307,19 @@ You can locate my Content-based Filtering Recommendation System with NLP in the 
 A Collaborative Filtering System recommends items indirectly by finding similar users.
 
 In this case, find someone that is similar to the user and recommend a restaurant that he/she
-highly rated. In my implementation, I used the information of unique users in the
-`Reviews` dataset along with the cosine similarity metric. Note this is similar
-to the Content-based Filtering System, but the information used is the user data
-instead of the data about the items (i.e the restaurants).
+highly rated. Thus, the main objective of a Collaborative Filtering System is to find
+similar users.
+
+#### B3A. Using information about the users
+
+Use information about the users to find similar users and then recommend items
+from similar users. Note this is similar to the Content-based Filtering System, but the 
+information used is the user data instead of the data about the items (i.e the restaurants).
+In my implementation, I used the information of unique users in the
+`Reviews` dataset along with the cosine similarity metric.
+
+Note the reason for using cosine similarity is that we want to find if users
+are similar or different, not how much they are similar or different (euclidean distance).
 
 ```py
 # aggregate data for each unique user
@@ -356,7 +367,145 @@ def collab_filter_demographic(name, n_similar):
     return( top_recs[['Restaurant Name', 'Rating']].reset_index().drop(columns=['level_1']) )
 ```
 
-You can locate my Collaborative Filtering Recommendation System with NLP in the `code` directory titled `collaborative`.
+You can locate my Collaborative Filtering Recommendation System with user information
+in the `code` directory titled `collaborative1`.
 
+#### B3B. Using information about the items directly from the users
+
+Recall that the purpose of finding similar users is to be able to find items to recommend
+that a user would probably like. Previously, we are able to recommend items indirectly by
+using information about the users to find similar users. However, we can also just
+recommend items directly by using information about the users that is associated with the items.
+
+In this case, instead of using information about the users, I will be using the
+ratings from the users themselves in order to find similar users.
+Let's illustrate an example. Suppose there are 5 users and 5 items.
+A possible dataset can be:
+
+|  | Item 1 | Item 2 | Item 3 | Item 4 | Item 5 |
+|-|-|-|-|-|-|
+| User 1 | 5 | 1 | 4 |   |   |
+| User 2 | 2 |   |   |   | 2 |
+| User 3 | 4 | 3 | 1 | 4 | 3 |
+| User 4 |   | 3 | 5 |   |   |
+| User 5 | 5 |   | 2 |   | 1 |
+
+Note that there exist a major issue with this type of information. It is rare that
+a user has interated with most of the items. This issue is known as data sparsity.
+A common solution is to use clustering. Rather than looking at individual users,
+we can cluster together similar users and average their information.
+Hopefully, this will lessen the problem with sparsity.
+In our example, suppose be determine the clusters are (1,4); (2,5); (3).
+Then, we find the average score per item within each cluster.
+
+|  | Item 1 | Item 2 | Item 3 | Item 4 | Item 5 |
+|-|-|-|-|-|-|
+| User 1,4  | 2.5   | 2 | 4.5   |   |       |
+| User 2,5  | 3.5   |   | 2     |   | 1.5   |
+| User 3    | 4     | 3 | 1     | 4 | 3     |
+
+Nice! The data is less sparse. However, there is still missing data.
+In this case, just perform some imputation to fill in the missing values.
+In this example, I will just impute with the average score per item
+across each cluster.
+
+|  | Item 1 | Item 2 | Item 3 | Item 4 | Item 5 |
+|-|-|-|-|-|-|
+| User 1,4  | 2.5   | 2     | 4.5   | 4 | 2.25  |
+| User 2,5  | 3.5   | 2.5   | 2     | 4 | 1.5   |
+| User 3    | 4     | 3     | 1     | 4 | 3     |
+
+Note I have not covered how to perform the clustering.
+There are several methods each with varying degrees of accuracy
+like K-means, Gaussian Mixture Models, DBSCAN, etc. I will not be covering
+clustering in-depth here, but I will show how to implement a simple K-means
+clustering using information about the users in Python.
+
+Ok, now lets' implement everything we covered above for our restaurant datasets.
+
+(1) Find the restaurant ratings by user.
+
+```py
+# user scores of each restaurant
+data_scores = reviews[['Reviewer Name', 'Restaurant Name', 'Rating']].groupby(['Reviewer Name', 'Restaurant Name']).agg(Rating = ('Rating', 'mean')).reset_index()
+data_scores_table = data_scores.pivot(index='Restaurant Name', columns='Reviewer Name', values='Rating').reset_index()
+# only consider restaurants that we have information on
+restaurants_considered = list(restaurants['Restaurant Name'])
+restaurants_considered.remove('Evanston Games & Cafe')
+data_scores_table = data_scores_table[data_scores_table['Restaurant Name'].isin(restaurants_considered)]
+```
+
+(2) Perform K-means clustering to deal with sparseness.
+
+Note that in my implementation, I chose 4 clusters. You can choose any number you want,
+but there exist methods to find the optimal amount of clusters, but I won't be
+covering it here.
+
+```py
+# first prepare the data for clustering
+data_users_num = data_demographics[['Birth Year', 'Weight (lb)', 'Height (in)']]
+data_users_cat = data_demographics.drop(columns=['Birth Year', 'Weight (lb)', 'Height (in)'])
+
+scaler = StandardScaler()
+data_users_scaled = scaler.fit_transform(data_users_num)
+data_users_scaled = np.column_stack((data_users_scaled, data_users_cat))
+
+# find which cluster than each user belong to
+kmeans_labels = KMeans(n_clusters=4, n_init=10, max_iter=10).fit_predict(data_users_scaled)
+```
+
+(3) Using the clusters, find the average rating of each restaurant within each cluster.
+
+```py
+# merge user names with which cluster they belong to
+data_users_clustered = np.column_stack((data_users['Reviewer Name'], kmeans_labels))
+data_users_clustered = pd.DataFrame(data_users_clustered, columns=['Reviewer Name', 'cluster'])
+data_scores_clustered = data_scores.merge(data_users_clustered, left_on='Reviewer Name', right_on='Reviewer Name')
+# find average rating by restaurant for each cluster
+avg_scores_clustered = data_scores_clustered.groupby(['cluster', 'Restaurant Name'])['Rating'].mean().unstack(level=0)
+```
+
+(4) Perform imputation for any remaining missingness.
+
+In my implementation, I impute with the average score per restaurant across each cluster.
+Note I melted the average clustered data for `value_vars` = $[0,1,2,3]$ because I used 4 clusters,
+but if you use m clusters, the `value_vars` = $[0,1,2,..,m-1]$.
+
+```py
+# if ratings still missing, impute rating as average rating across clusters
+avg_scores_clustered = avg_scores_clustered.apply(lambda row: row.fillna(row.mean()), axis=1).reset_index()
+avg_scores_clustered = pd.melt(avg_scores_clustered, id_vars='Restaurant Name', value_vars=[0, 1, 2, 3]).reset_index()
+# merge user name with their cluster data
+data_user_avg_scores_clustered = data_users_clustered.merge(avg_scores_clustered, how='right', on='cluster')
+data_user_avg_scores_clustered = data_user_avg_scores_clustered[['Reviewer Name', 'Restaurant Name', 'value']]
+data_avg_scores_table = data_user_avg_scores_clustered.pivot(index='Restaurant Name', columns='Reviewer Name', values='value').reset_index()
+data_avg_scores_table = data_avg_scores_table[data_avg_scores_table['Restaurant Name'].isin(restaurants_considered)]
+# impute missingness in user scores of each restaurant
+data_scores_table_complete = data_scores_table.fillna(data_avg_scores_table)
+```
+
+(5) Compute the cosine distance between each user and recommend items from
+someone that is most similar to the user.
+
+
+In my implementation, I found the top n most similar users and find all restaurants
+that they rated. Then, returned the restaurants that are the highest rated.
+
+```py
+user_scores_cosine = pd.DataFrame(
+    cosine_distances(data_scores_table_complete.drop(columns=['Restaurant Name']).T, data_scores_table_complete.drop(columns=['Restaurant Name']).T),
+    columns=data_scores_table_complete.columns[1:],
+    index=data_scores_table_complete.columns[1:]
+)
+
+def collab_filter_scores(name, n_similar):
+    most_similar_users = user_scores_cosine[user_scores_cosine.index != name][name].sort_values(ascending=True).index[0:n_similar]
+    possible_recs = reviews[reviews['Reviewer Name'].isin(most_similar_users)].groupby(['Reviewer Name'])
+    top_recs = possible_recs.apply(lambda x: x[x['Rating'] == x['Rating'].max()])
+    return( top_recs[['Restaurant Name', 'Rating']].reset_index().drop(columns=['level_1']) )
+```
+
+You can locate my Collaborative Filtering Recommendation System with user' score ratings
+in the `code` directory titled `collaborative2`.
 
 
