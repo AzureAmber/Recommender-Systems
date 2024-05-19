@@ -90,8 +90,8 @@ avg_scores['shrinkage_Rating'] = (avg_scores['count'] * avg_scores['avg_Rating']
 ```
 
 Finally, using either the average rating or shrinkage rating, recommend restaurants
-with the highest ratings. For my implementation, I also recommend restuarants based
-on the tpye of cuisine.
+with the highest ratings. For my implementation, I also recommend restaurants based
+on the type of cuisine.
 
 ```py
 def popularity_recommendation(cuisine_type, max_sugest, score_type='Default'):
@@ -129,9 +129,9 @@ A common solution is to apply some kind of normalization. Some types are:
 (2) Categorical variables cannot be directly used. You need to apply some kind of
 numerical encoding to transform categorical into numerical.
 A common method is to use one-hot encoding.
-Basically, if a categorical variable $C$ has m possible classes, $c_1,...,c_m$, create m-1 new
-variables, $C_1,...,C_{m-1}$, where the $C_i = 1$ if the $C = c_i$ and
-$C_i = 0$ if the $C \not = c_i$.
+Basically, if a categorical variable $C$ has m possible classes, $c_1,...,c_m$ create m-1 new
+variables, $C_1,...,C_{m-1}$ where $C_i = 1$ if $C = c_i$ and
+$C_i = 0$ if $C \not = c_i$.
 
 ```py
 # one-hot encoding for categorical
@@ -181,9 +181,9 @@ You can locate my Content-based Filtering Recommendation System in the `code` di
 ### C2. Using NLP
 
 Another method instead of using numerical or categorical variables is to use NLP.
-Since items sometimes are associated with some kind of description, you can use NLP
-to convert descriptions into numerical embedding. Then, these embeddings can be used
-with the similarity metric.
+Since items are sometimes associated with some kind of description, you can use NLP
+to convert descriptions into numerical embeddings. Then, these embeddings can be used
+with a similarity metric similar to how numerical / categorical information was used previously.
 
 Some models that perform NLP well are BERT and GPT.
 In this project, I will instead perform some low level NLP that are easier to understand.
@@ -215,7 +215,7 @@ restaurants_jaccard = pd.DataFrame(
 ```
 
 Then, recommend items with low Jaccard distances to the user's highly rated restaurant.
-In my implementation, instead of choosing the user's highest rating restaurant, I
+In my implementation, instead of choosing the highest rated restaurant from the user, I
 took a random restaurant that the user highly rated.
 
 ```py
@@ -237,7 +237,7 @@ For word w:
 
 
 $$
-    TF\_IDF(w,D_i) = \frac{\text{number of times w appears in } D_i}
+    TFIDF(w,D_i) = \frac{\text{number of times w appears in } D_i}
                     {\text{number of words in } D_i}
         * \ln( \frac{\text{number of } D_i}{\text{number of } D_i \text{ with w}} )
 $$
@@ -293,6 +293,7 @@ restaurants_td_idf_euclidean = pd.DataFrame(
     euclidean_distances(restaurants_td_idf, restaurants_td_idf),
     columns=restaurants['Restaurant Name'], index=restaurants['Restaurant Name']
 )
+
 # recommendation system
 def contentfilter_recommendation_td_idf(name, max_suggest):
     reviewer_restaurants = reviews[reviews['Reviewer Name'] == name]
@@ -324,7 +325,7 @@ In my implementation, I used the information of unique users in the
 `Reviews` dataset along with the cosine similarity metric.
 
 Note the reason for using cosine similarity is that we want to find if users
-are similar or different, not how much they are similar or different (euclidean distance).
+are similar or different, not how much they are similar or different (i.e. euclidean distance).
 
 ```py
 # aggregate data for each unique user
@@ -352,6 +353,7 @@ data_users = pd.get_dummies(
 )
 # remove user name
 data_demographics = data_users.drop(columns=['Reviewer Name'])
+
 # cosine distance of users
 user_demo_cosine = pd.DataFrame(
     cosine_distances(data_demographics, data_demographics),
@@ -385,7 +387,7 @@ recommend items directly by using information about the users that is associated
 In this case, instead of using information about the users, I will be using the
 ratings from the users themselves in order to find similar users.
 Let's illustrate an example. Suppose there are 5 users and 5 items.
-A possible dataset can be:
+A possible dataset is:
 
 |  | Item 1 | Item 2 | Item 3 | Item 4 | Item 5 |
 |-|-|-|-|-|-|
@@ -396,7 +398,7 @@ A possible dataset can be:
 | User 5 | 5 |   | 2 |   | 1 |
 
 Note that there exist a major issue with this type of information. It is rare that
-a user has interated with most of the items. This issue is known as data sparsity.
+a user has interacted with most items. This issue is known as data sparsity.
 A common solution is to use clustering. Rather than looking at individual users,
 we can cluster together similar users and average their information.
 Hopefully, this will lessen the problem with sparsity.
@@ -434,6 +436,7 @@ Ok, now lets' implement everything we covered above for our restaurant datasets.
 # user scores of each restaurant
 data_scores = reviews[['Reviewer Name', 'Restaurant Name', 'Rating']].groupby(['Reviewer Name', 'Restaurant Name']).agg(Rating = ('Rating', 'mean')).reset_index()
 data_scores_table = data_scores.pivot(index='Restaurant Name', columns='Reviewer Name', values='Rating').reset_index()
+
 # only consider restaurants that we have information on
 restaurants_considered = list(restaurants['Restaurant Name'])
 restaurants_considered.remove('Evanston Games & Cafe')
@@ -465,7 +468,11 @@ kmeans_labels = KMeans(n_clusters=4, n_init=10, max_iter=10).fit_predict(data_us
 # merge user names with which cluster they belong to
 data_users_clustered = np.column_stack((data_users['Reviewer Name'], kmeans_labels))
 data_users_clustered = pd.DataFrame(data_users_clustered, columns=['Reviewer Name', 'cluster'])
-data_scores_clustered = data_scores.merge(data_users_clustered, left_on='Reviewer Name', right_on='Reviewer Name')
+data_scores_clustered = data_scores.merge(
+    data_users_clustered,
+    left_on='Reviewer Name', right_on='Reviewer Name'
+)
+
 # find average rating by restaurant for each cluster
 avg_scores_clustered = data_scores_clustered.groupby(['cluster', 'Restaurant Name'])['Rating'].mean().unstack(level=0)
 ```
@@ -477,21 +484,31 @@ Note I melted the average clustered data for `value_vars` = $[0,1,2,3]$ because 
 but if you use m clusters, the `value_vars` = $[0,1,2,..,m-1]$.
 
 ```py
-# if ratings still missing, impute rating as average rating across clusters
+# fill in remaining missingness with average rating by restaurant across clusters
 avg_scores_clustered = avg_scores_clustered.apply(lambda row: row.fillna(row.mean()), axis=1).reset_index()
-avg_scores_clustered = pd.melt(avg_scores_clustered, id_vars='Restaurant Name', value_vars=[0, 1, 2, 3]).reset_index()
-# merge user name with their cluster data
-data_user_avg_scores_clustered = data_users_clustered.merge(avg_scores_clustered, how='right', on='cluster')
+avg_scores_clustered = pd.melt(
+    avg_scores_clustered,
+    id_vars='Restaurant Name', value_vars=[0, 1, 2, 3]
+).reset_index()
+
+# merge clustered user data with the average ratings across clusters
+data_user_avg_scores_clustered = data_users_clustered.merge(
+    avg_scores_clustered,
+    how='right', on='cluster'
+)
 data_user_avg_scores_clustered = data_user_avg_scores_clustered[['Reviewer Name', 'Restaurant Name', 'value']]
-data_avg_scores_table = data_user_avg_scores_clustered.pivot(index='Restaurant Name', columns='Reviewer Name', values='value').reset_index()
+## the table below contains for each user, their cluster's average restaurant ratings along with the missing values imputed
+data_avg_scores_table = data_user_avg_scores_clustered.pivot(
+    index='Restaurant Name', columns='Reviewer Name', values='value'
+).reset_index()
 data_avg_scores_table = data_avg_scores_table[data_avg_scores_table['Restaurant Name'].isin(restaurants_considered)]
-# impute missingness in user scores of each restaurant
+
+# fix sparsity = replace missing values with values from the table above
 data_scores_table_complete = data_scores_table.fillna(data_avg_scores_table)
 ```
 
 (5) Compute the cosine distance between each user and recommend items from
 someone that is most similar to the user.
-
 
 In my implementation, I found the top n most similar users and find all restaurants
 that they rated. Then, returned the restaurants that are the highest rated.
@@ -513,7 +530,27 @@ def collab_filter_scores(name, n_similar):
     return( top_recs[['Restaurant Name', 'Rating']].reset_index().drop(columns=['level_1']) )
 ```
 
-You can locate my Collaborative Filtering Recommendation System with users' score ratings
+You can locate my Collaborative Filtering Recommendation System with user
+information related to the output (i.e. just the restaurant ratings)
 in the `code` directory titled `collaborative2`.
 
+It should be noted that using Collaborative Filtering Recommendation System with user
+information related to the output sometimes have an issue where the recommendation is
+an item that the user has already interacted with. This is due to the fact that grouping
+users with similar information directly related to the output will generally lead to users
+in the same group having outputs that are similar. Thus, the recommendation system is recommending
+outputs that the user may already have interacted with.
 
+Some possible "solutions" will be (1) filter recommendations that are new to the user
+or (2) generate recommendations from people that are somewhat similar to the user,
+not the most similar.
+
+
+
+
+
+## E. Conclusion
+
+Congratulations! You finished learning why and how to develop a few types of
+recommender systems as well as learn a bit about some common machine learning
+techniques (i.e. standardization, one-hot encoding, NLP, clustering). 
