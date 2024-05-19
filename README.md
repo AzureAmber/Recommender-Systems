@@ -493,7 +493,10 @@ that they rated. Then, returned the restaurants that are the highest rated.
 
 ```py
 user_scores_cosine = pd.DataFrame(
-    cosine_distances(data_scores_table_complete.drop(columns=['Restaurant Name']).T, data_scores_table_complete.drop(columns=['Restaurant Name']).T),
+    cosine_distances(
+        data_scores_table_complete.drop(columns=['Restaurant Name']).T,
+        data_scores_table_complete.drop(columns=['Restaurant Name']).T
+    ),
     columns=data_scores_table_complete.columns[1:],
     index=data_scores_table_complete.columns[1:]
 )
